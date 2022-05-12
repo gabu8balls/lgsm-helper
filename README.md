@@ -1,2 +1,2 @@
 # gabulinux
-Some random stuff...
+Just some random stuff.
