@@ -47,17 +47,26 @@ function fn_varcheck() # Check if variable has a valid string
 	local USERPORTS; USERPORTS="$1"
 
 	## Check if it's empty
-	if [[ -n $USERPORTS ]]; then
-		## Check if it contains non alpha numeric characters
-		if [[ ! $USERPORTS =~ ^[[:alnum:]]+$ ]]; then
-			printf "\n%sInvalid port number.%s\n" "${RED}" "${NC}"
-			exit 1
-		## Or letters
-		elif [[ $USERPORTS =~ ^[a-zA-Z]+$ ]]; then
-			printf "\n%sInvalid port number.%s\n" "${RED}" "${NC}"
-			exit 1
-		fi
+	if [[ ! $USERPORTS =~ ^([0-9]{1,5}\-[0-9]{1,5}|[0-9]{1,5})(\ ([0-9]{1,5}\-[0-9]{1,5}|[0-9]{1,5}))*$ ]]; then
+    printf "A(s) porta(s) informada(s) não atendem a obrigatoriedade"
+		exit 1
 	fi
+
+	# Validando se as portas estão no range 1025-49150
+  for aString in ${USERPORTS[@]}; do
+    if [[ ${aString} =~ [0-9]{1,5} ]]; then
+      echo "0" ${BASH_REMATCH[0]}
+      if [[ ${BASH_REMATCH[0]} -le 1024 ]]; then
+        echo "porta menor ou igual a 1024" 
+        exit 1
+      elif [[ ${BASH_REMATCH[0]} -gt 49150 ]]; then
+        echo "porta maior que 49150"
+        exit 1
+      fi
+    fi
+  done
+
+	
 
 	return 0
 }
