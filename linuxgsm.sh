@@ -20,11 +20,12 @@
 ######################################################################
 
 declare -gr VERSION="0.1a"
-declare -gr RED=$(tput setaf 1)
-declare -gr GREEN=$(tput setaf 2)
-declare -gr BLUE=$(tput setaf 4)
-declare -gr NC=$(tput sgr0)
 declare -gr oIFS="$IFS"
+
+declare -g RED; RED=$(tput setaf 1)
+declare -g GREEN; GREEN=$(tput setaf 2)
+declare -g BLUE; BLUE=$(tput setaf 4)
+declare -g NC; NC=$(tput sgr0)
 
 declare -gi VOLUME
 
@@ -42,7 +43,7 @@ function fn_depcheck() # Check for dependencies
 {
 	declare DEPCHECK
 
-	for DEPCHECK in $@; do
+	for DEPCHECK in "$@"; do
 		if ! command -v "${DEPCHECK}" > /dev/null 2>&1; then
 			printf "\n%sI need \'%s\' to run this script.%s\n" "${RED}" "${DEPCHECK}" "${NC}"
 			exit 1
@@ -77,7 +78,7 @@ function fn_srvlist() # Process the server list data
 function fn_menu() # Create the menu
 {
 	## Process the server list data
-	declare GAMESLIST=$(fn_srvlist)
+	declare GAMESLIST; GAMESLIST=$(fn_srvlist)
 
 	IFS="¦"
 	GAME=$(whiptail --menu "Choose a game:" --title "LinuxGSM v${VERSION}" 30 60 22 ${GAMESLIST} 3>&1 1>&2 2>&3)
@@ -94,7 +95,7 @@ function fn_menu() # Create the menu
 function fn_varcheck() # Check if variable has a valid string
 {
 	declare USERPORTS="$1"
-	declare -a PORTARRAY
+	declare PORTARRAY
 	declare PORTTEST
 
 	if [[ ! ${USERPORTS} =~ ^([0-9]{1,5}\-[0-9]{1,5}|[0-9]{1,5})(\ ([0-9]{1,5}\-[0-9]{1,5}|[0-9]{1,5}))*$ ]]; then
@@ -103,10 +104,10 @@ function fn_varcheck() # Check if variable has a valid string
 	fi
 
 	IFS=" "
-	PORTARRAY=$(echo ${USERPORTS} | tr "-" " ")
+	PORTARRAY=$(echo "${USERPORTS}" | tr "-" " ")
 	IFS="$oIFS"
 
-	for PORTTEST in ${PORTARRAY[@]}; do
+	for PORTTEST in "${PORTARRAY[@]}"; do
 		if [[ ${PORTTEST} =~ [0-9]{4,5} ]]; then
 			if [[ ${PORTTEST} -lt 1025 || ${PORTTEST} -gt 49150 ]]; then
 				printf "\n%sPort(s) must be higher than 1024 and lower than 49151.%s\n" "${RED}" "${NC}"
