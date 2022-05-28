@@ -95,29 +95,29 @@ function fn_menu() # Create the menu
 function fn_varcheck() # Check if variable has a valid string
 {
 	declare USERPORTS="$1"
-	declare PORTARRAY
+	declare PORTLIST
 	declare PORTTEST
 
-	if [[ ! ${USERPORTS} =~ ^([0-9]{1,5}\-[0-9]{1,5}|[0-9]{1,5})(\ ([0-9]{1,5}\-[0-9]{1,5}|[0-9]{1,5}))*$ ]]; then
-		printf "\n%sSorry, invalid format.\nIt must be like this: 27015 27020-27030 30000%s\n" "${RED}" "${NC}"
-		exit 1
-	fi
-
-	IFS=" "
-	PORTARRAY=$(echo "${USERPORTS}" | tr "-" " ")
-	IFS="$oIFS"
-
-	for PORTTEST in "${PORTARRAY[@]}"; do
-		if [[ ${PORTTEST} =~ [0-9]{4,5} ]]; then
-			if [[ ${PORTTEST} -lt 1025 || ${PORTTEST} -gt 49150 ]]; then
+	if [[ -n "${USERPORTS}" ]]; then
+		if [[ ! ${USERPORTS} =~ ^([0-9]{1,5}\-[0-9]{1,5}|[0-9]{1,5})(\ ([0-9]{1,5}\-[0-9]{1,5}|[0-9]{1,5}))*$ ]]; then
+			printf "\n%sSorry, invalid format.\nIt must be like this: 27015 27020-27030 30000%s\n" "${RED}" "${NC}"
+			exit 1
+		fi
+		IFS=" "
+		PORTLIST=$(echo "${USERPORTS}" | tr "-" " ")
+		IFS="$oIFS"
+		for PORTTEST in "${PORTLIST[@]}"; do
+			if [[ ${PORTTEST} =~ [0-9]{4,5} ]]; then
+				if [[ ${PORTTEST} -lt 1025 || ${PORTTEST} -gt 49150 ]]; then
+					printf "\n%sPort(s) must be higher than 1024 and lower than 49151.%s\n" "${RED}" "${NC}"
+					exit 1
+				fi
+			else
 				printf "\n%sPort(s) must be higher than 1024 and lower than 49151.%s\n" "${RED}" "${NC}"
 				exit 1
 			fi
-		else
-			printf "\n%sPort(s) must be higher than 1024 and lower than 49151.%s\n" "${RED}" "${NC}"
-			exit 1
-		fi
-	done
+		done
+	fi
 
 	return 0
 }
