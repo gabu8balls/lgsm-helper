@@ -95,6 +95,7 @@ function fn_menu() # Create the menu
 function fn_varcheck() # Check if variable has a valid string
 {
 	declare USERPORTS="$1"
+	declare -a RANGES
 	declare -a PORTLIST
 	declare PORTTEST
 
@@ -103,6 +104,7 @@ function fn_varcheck() # Check if variable has a valid string
 			printf "\n%sSorry, invalid format.\nIt must be like this: 27015 27020-27030 30000%s\n" "${RED}" "${NC}"
 			exit 1
 		fi
+		#TODO: Verify in port ranges if the later is higher
 		USERPORTS=$(echo "${USERPORTS}" | tr "-" " ")
 		IFS=' ' read -r -a PORTLIST <<< "${USERPORTS}"
 		IFS="$oIFS"
@@ -222,8 +224,8 @@ if (whiptail --title "LinuxGSM v${VERSION}" --yesno "I will create a Docker cont
 	elif [[ "${VOLUME}" == "1" ]]; then
 		printf "\nUsing Docker volume %s previously created.\n" "${GAME}"
 	fi
-	docker run -d -i -t --init -h $GAME --name $GAME -u linuxgsm --restart unless-stopped -v $GAME:/home/linuxgsm $TCPPORTS $UDPPORTS \
-	-e GAMESERVER=$GAME -e LGSM_GITHUBUSER=GameServerManagers -e LGSM_GITHUBREPO=LinuxGSM -e LGSM_GITHUBBRANCH=master \
+	eval docker run -d -i -t --init -h "${GAME}" --name "${GAME}" -u linuxgsm --restart unless-stopped -v "${GAME}":/home/linuxgsm "${TCPPORTS}" "${UDPPORTS}" \
+	-e GAMESERVER="${GAME}" -e LGSM_GITHUBUSER=GameServerManagers -e LGSM_GITHUBREPO=LinuxGSM -e LGSM_GITHUBBRANCH=master \
 	gameservermanagers/linuxgsm-docker:latest > /dev/null 2>&1
 else
 	printf "\nAborting...\n"
