@@ -95,7 +95,7 @@ function fn_menu() # Create the menu
 function fn_varcheck() # Check if variable has a valid string
 {
 	declare USERPORTS="$1"
-	declare PORTLIST
+	declare -a PORTLIST
 	declare PORTTEST
 
 	if [[ -n "${USERPORTS}" ]]; then
@@ -103,9 +103,17 @@ function fn_varcheck() # Check if variable has a valid string
 			printf "\n%sSorry, invalid format.\nIt must be like this: 27015 27020-27030 30000%s\n" "${RED}" "${NC}"
 			exit 1
 		fi
+		#
+		#PORTLIST=$(echo "${USERPORTS}" | tr "-" " ")
+		#
+		echo "Antes: ${USERPORTS}"
+		USERPORTS=$(echo "${USERPORTS}" | tr "-" " ")
+		echo "Depois: ${USERPORTS}"
 		IFS=" "
-		PORTLIST=$(echo "${USERPORTS}" | tr "-" " ")
+		PORTLIST=( "${USERPORTS}" )
 		IFS="$oIFS"
+		echo "Final: ${PORTLIST[0]}"
+		#
 		for PORTTEST in "${PORTLIST[@]}"; do
 			if [[ ${PORTTEST} =~ [0-9]{4,5} ]]; then
 				if [[ ${PORTTEST} -lt 1025 || ${PORTTEST} -gt 49150 ]]; then
@@ -192,7 +200,7 @@ fi
 # Get the TCP port(s) to be exposed
 USERTCP=$(whiptail --title "LinuxGSM v${VERSION}" --inputbox \
 "Please, enter the TCP Ports to be exposed or leave empty if none.\nSeparate multiple ports with spaces.\nUse a dash for ranges.\n\ne.g.: 27015 27020-27030 30000" \
-12 60 3>&1 1>&2 2>&3)
+12 70 3>&1 1>&2 2>&3)
 
 ## Check if variable has a valid string
 fn_varcheck "${USERTCP}"
@@ -200,7 +208,7 @@ fn_varcheck "${USERTCP}"
 # Get the UDP port(s) to be exposed
 USERUDP=$(whiptail --title "LinuxGSM v${VERSION}" --inputbox \
 "Now, enter the UDP Ports to be exposed or leave empty if none.\nSame as before: Separate multiple ports with spaces\nand a dash for ranges.\n\ne.g.: 27015 27020-27030 30000" \
-12 60 3>&1 1>&2 2>&3)
+12 70 3>&1 1>&2 2>&3)
 
 ## Check if variable has a valid string
 fn_varcheck "${USERUDP}"
@@ -210,9 +218,6 @@ if [[ -z ${USERTCP} && -z ${USERUDP} ]]; then
 	printf "\n%sYou must type at least one TCP or UDP port.%s\n" "${RED}" "${NC}"
 	exit 1
 fi
-
-# So far, so good
-printf "\nMoving on...\n"
 
 ## Arrange TCP and/or UDP port(s)
 fn_ports
