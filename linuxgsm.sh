@@ -4,180 +4,142 @@
 # Gabriel (Gabu) Salvador                                            #
 # gbsalvador at gmail.com                                            #
 #                                                                    #
-# Unofficial script for Linux Game Server Manager                    #
-# License: GPLv2                                                     #
+# André (Magrão) Borali                                              #
+# andreborali at gmail.com                                           #
+#                                                                    #
+#                                                                    #
+#                                                                    #
+# Unofficial script to create a LinuxGSM container                   #
+# License: Creative Commons                                          #
 ######################################################################
 
-clear
 
-# Global variables
-declare -g VERSION; VERSION="0.1a"; readonly VERSION
-declare -g RED; RED=$(tput setaf 1); readonly RED
-declare -g GREEN; GREEN=$(tput setaf 2); readonly GREEN
-declare -g BLUE; BLUE=$(tput setaf 4); readonly BLUE
-declare -g NC; NC=$(tput sgr0); readonly NC
-declare -g oIFS; oIFS="$IFS"; readonly oIFS
+
+######################################################################
+#                          GLOBAL VARIABLES                          #
+######################################################################
+
+declare -gr VERSION="0.1a"
+declare -gr RED=$(tput setaf 1)
+declare -gr GREEN=$(tput setaf 2)
+declare -gr BLUE=$(tput setaf 4)
+declare -gr NC=$(tput sgr0)
+declare -gr oIFS="$IFS"
+
+declare -gi VOLUME
+
 declare -g GAME
-declare -g VOLUME
 declare -g USERTCP
 declare -g USERUDP
 declare -g TCPPORTS
 declare -g UDPPORTS
 
-# Functions
-function fn_dependency() # Check for required dependencies
+######################################################################
+#                             FUNCTIONS                              #
+######################################################################
+
+function fn_depcheck() # Check for dependencies
 {
-	local DEPCHECK
-	for DEPCHECK in 'docker' 'wget' 'whiptail' 'wc'; do
-		if ! command -v "$DEPCHECK" > /dev/null 2>&1; then
-			printf "%sI need \'%s\' to run this script%s\n" "${RED}" "${DEPCHECK}" "${NC}"
+	declare DEPCHECK
+
+	for DEPCHECK in $@; do
+		if ! command -v "${DEPCHECK}" > /dev/null 2>&1; then
+			printf "\n%sI need \'%s\' to run this script.%s\n" "${RED}" "${DEPCHECK}" "${NC}"
 			exit 1
 		fi
 	done
+
+	return 0
+}
+
+function fn_srvlist() # Process the server list data
+{
+	declare -a GAMEARRAY
+	declare -a GAMEID
+	declare -a GAMENAME
+	declare -ir NUM=$(wc -l < /tmp/serverlist.csv)
+	declare -i X
+
+	while IFS=',' read -ra GAMEARRAY; do
+		GAMEID+=("${GAMEARRAY[1]}")
+		GAMENAME+=("${GAMEARRAY[2]}")
+	done < /tmp/serverlist.csv
+
+	IFS="$oIFS"
+
+	for (( X=0; X < NUM; X++ )); do
+		printf '%s¦ %s ¦' "${GAMEID[$X]}" "${GAMENAME[$X]}"
+	done
+
+	return 0
+}
+
+function fn_menu() # Create the menu
+{
+	## Process the server list data
+	declare GAMESLIST=$(fn_srvlist)
+
+	IFS="¦"
+	GAME=$(whiptail --menu "Choose a game:" --title "LinuxGSM v${VERSION}" 30 60 22 ${GAMESLIST} 3>&1 1>&2 2>&3)
+	IFS="$oIFS"
+
+	if [[ -z ${GAME} ]]; then
+		printf "\n%sYou must choose a game.%s\n" "${RED}" "${NC}"
+		exit 1
+	fi
 
 	return 0
 }
 
 function fn_varcheck() # Check if variable has a valid string
 {
-	## Ports must be higher than 1024 and lower than 49151
-	## Allow dashes and spaces
+	declare USERPORTS="$1"
+	declare -a PORTARRAY
+	declare PORTTEST
 
-	## Local variable
-	local USERPORTS; USERPORTS="$1"
-
-	## Check if it's empty
-	if [[ ! $USERPORTS =~ ^([0-9]{1,5}\-[0-9]{1,5}|[0-9]{1,5})(\ ([0-9]{1,5}\-[0-9]{1,5}|[0-9]{1,5}))*$ ]]; then
-    printf "A(s) porta(s) informada(s) não atendem a obrigatoriedade"
+	if [[ ! ${USERPORTS} =~ ^([0-9]{1,5}\-[0-9]{1,5}|[0-9]{1,5})(\ ([0-9]{1,5}\-[0-9]{1,5}|[0-9]{1,5}))*$ ]]; then
+		printf "\n%sSorry, invalid format.\nIt must be like this: 27015 27020-27030 30000%s\n" "${RED}" "${NC}"
 		exit 1
 	fi
 
-	# Validando se as portas estão no range 1025-49150
-  for aString in ${USERPORTS[@]}; do
-    if [[ ${aString} =~ [0-9]{1,5} ]]; then
-      echo "0" ${BASH_REMATCH[0]}
-      if [[ ${BASH_REMATCH[0]} -le 1024 ]]; then
-        echo "porta menor ou igual a 1024" 
-        exit 1
-      elif [[ ${BASH_REMATCH[0]} -gt 49150 ]]; then
-        echo "porta maior que 49150"
-        exit 1
-      fi
-    fi
-  done
-
-	
-
-	return 0
-}
-
-function fn_srvlist() # Download servers list, treat the information and print the result
-{
-	## Download servers list
-	if ! wget -q -O /tmp/serverlist.csv https://raw.githubusercontent.com/GameServerManagers/LinuxGSM/master/lgsm/data/serverlist.csv > /dev/null 2>&1; then
-		printf "\n%sI could not download the servers list.%s\n" "${RED}" "${NC}"
-		exit 1
-	fi
-
-	## Local variables
-	local ARRAY=()
-	local GAMEID=()
-	local GAMENAME=()
-	local NUM; NUM=$(wc -l < /tmp/serverlist.csv)
-	local X
-
-	## Treat the information
-	while IFS=',' read -ra ARRAY; do
-		GAMEID+=("${ARRAY[1]}")
-		GAMENAME+=("${ARRAY[2]}")
-	done < /tmp/serverlist.csv
-
-	## Print the result
-	for (( X=0; X < NUM; X++)); do
-		printf '%s¦ %s ¦' "${GAMEID[$X]}" "${GAMENAME[$X]}"
-	done
-
-	rm /tmp/serverlist.csv
-
-	return 0
-}
-
-function fn_game() # Let the user choose the game and specify the port(s) to be exposed
-{
-	## Local variable
-	local GAMESLIST; GAMESLIST=$(fn_srvlist)
-
-	## Create game servers list menu dialog
-	IFS="¦"
-	GAME=$(whiptail --menu "Choose a game:" --title "LinuxGSM v${VERSION}" 30 60 22 ${GAMESLIST} 3>&1 1>&2 2>&3)
+	IFS=" "
+	PORTARRAY=$(echo ${USERPORTS} | tr "-" " ")
 	IFS="$oIFS"
 
-	## And check if didn't left it empty
-	if [[ -z $GAME ]]; then
-		printf "\n%sYou must choose a game!%s\n" "${RED}" "${NC}"
-		exit 1
-	fi
-
-	## Check if the volume already exists
-	if docker volume ls | grep "$GAME" > /dev/null 2>&1; then
-		printf "%sWARNING!!!%s\n\nVolume %s already exists.\nType %sYES%s if you want to proceed: " "${RED}" "${NC}" "${GAME}" "${BLUE}" "${NC}"
-		read -r
-		if [[ $REPLY != "YES" ]]; then
+	for PORTTEST in ${PORTARRAY[@]}; do
+		if [[ ${PORTTEST} =~ [0-9]{4,5} ]]; then
+			if [[ ${PORTTEST} -lt 1025 || ${PORTTEST} -gt 49150 ]]; then
+				printf "\n%sPort(s) must be higher than 1024 and lower than 49151.%s\n" "${RED}" "${NC}"
+				exit 1
+			fi
+		else
+			printf "\n%sPort(s) must be higher than 1024 and lower than 49151.%s\n" "${RED}" "${NC}"
 			exit 1
 		fi
-		VOLUME=1
-	else
-		VOLUME=0
-	fi
-
-	## Create TCP Ports input dialog
-	USERTCP=$(whiptail --title "LinuxGSM v${VERSION}" --inputbox \
-	"Please, enter the TCP Ports to be exposed.\nSeparate multiple ports with spaces.\nUse a dash for ranges.\n\ne.g.: 1000 2000-2010 4321" \
-	12 60 3>&1 1>&2 2>&3)
-	## Check if the input format is OK
-	fn_varcheck "$USERTCP"
-
-	## Create UDP Ports input dialog
-	USERUDP=$(whiptail --title "LinuxGSM v${VERSION}" --inputbox \
-	"Now, enter the UDP Ports to be exposed.\nSame as before: Separate multiple ports with spaces\nand a dash for ranges.\n\ne.g.: 1000 2000-2010 4321" \
-	12 60 3>&1 1>&2 2>&3)
-	## Check if the input format is OK
-	fn_varcheck "$USERUDP"
-
-	## And check if they're not both empty
-	if [[ -z $USERTCP && -z $USERUDP ]]; then
-		printf "\n%sYou must type at least one TCP or UDP port.%s\n" "${RED}" "${NC}"
-		exit 1
-	fi
-
-	## So far, so good
-	printf "\nMoving on...\n"
+	done
 
 	return 0
 }
 
 function fn_ports() # Arrange TCP and/or UDP port(s)
 {
-	## Local variable
-	local ARRAY=()
-	
-	## If there are TCP ports defined, arrange them
+	declare -a PORTARRAY
+	declare -i Y=0
+	declare -i Z=0
+
 	if [[ -n "${USERTCP}" ]]; then
-		local Y; Y=0
-		IFS=' ' read -r -a ARRAY <<< "$USERTCP"
-		while [ "$Y" -lt "${#ARRAY[@]}" ]; do
-			TCPPORTS="$TCPPORTS -p ${ARRAY[$Y]}:${ARRAY[$Y]}/tcp"
+		IFS=' ' read -r -a PORTARRAY <<< "${USERTCP}"
+		while [ "$Y" -lt "${#PORTARRAY[@]}" ]; do
+			TCPPORTS="$TCPPORTS -p ${PORTARRAY[$Y]}:${PORTARRAY[$Y]}/tcp"
 			(( Y++ )) || true
 		done
 		IFS="$oIFS"
 	fi
 
-	## If there are UDP ports defined, arrange them
 	if [[ -n "${USERUDP}" ]]; then
-		local Z; Z=0
-		IFS=' ' read -r -a ARRAY <<< "$USERUDP"
-		while [ "$Z" -lt "${#ARRAY[@]}" ]; do
-			UDPPORTS="$UDPPORTS -p ${ARRAY[$Z]}:${ARRAY[$Z]}/udp"
+		IFS=' ' read -r -a PORTARRAY <<< "${USERUDP}"
+		while [ "$Z" -lt "${#PORTARRAY[@]}" ]; do
+			UDPPORTS="$UDPPORTS -p ${PORTARRAY[$Z]}:${PORTARRAY[$Z]}/udp"
 			(( Z++ )) || true
 		done
 		IFS="$oIFS"
@@ -186,61 +148,88 @@ function fn_ports() # Arrange TCP and/or UDP port(s)
 	return 0
 }
 
-function fn_volume() # Create or use existing Docker volume
-{
-	## If volume does not exist, then create it
-	if [[ "${VOLUME}" == "0" ]]; then
-		printf "\nCreating Docker volume %s to store your game files...\n" "${GAME}"
-		docker volume create "${GAME}" > /dev/null 2>&1
-	## If volume already exist, ask to use it
-	elif [[ "${VOLUME}" == "1" ]]; then
-		printf "\nUsing Docker volume %s previously created.\n\n%sTHIS IS YOUR LAST CHANCE TO NOT RUIN EVERYTHING.%s\n" "${GAME}" "${RED}" "${NC}"
-		printf "\nType %sYES%s if you want to proceed: " "${BLUE}" "${NC}"
-		read -r
-		### Exit if answer is not YES
-		if [[ $REPLY != "YES" ]]; then
-			exit 1
-		fi
-	## WHAT THE F***
-	else
-		printf "\n%sHOW DID YOU GET HERE, PEASANT?%s\n" "${RED}" "${NC}"
-		exit 1
+######################################################################
+#                                MAIN                                #
+######################################################################
+
+clear
+
+## Check for dependencies
+fn_depcheck "docker" "wget" "whiptail" "wc" "tr"
+
+# Get the latest LinuxGSM server list from GitHub
+if ! wget -q -O /tmp/serverlist.csv https://raw.githubusercontent.com/GameServerManagers/LinuxGSM/master/lgsm/data/serverlist.csv > /dev/null 2>&1; then
+	printf "\n%sOops! I could not download the servers list.%s\n" "${RED}" "${NC}"
+	exit 1
+fi
+
+## Create the menu
+fn_menu
+
+# Remove server list temp file
+rm /tmp/serverlist.csv
+
+# Check if game server already exists
+if docker container ls | grep "${GAME}" > /dev/null 2>&1; then
+	printf "\n%sWARNING!!!%s\n\nGame server %s already exists.\nPlease, select another game.\n" "${RED}" "${NC}" "${GAME}"
+	exit 1
+fi
+
+if docker volume ls | grep "${GAME}" > /dev/null 2>&1; then
+	printf "\n%sWARNING!!!%s\n\nThere is already a repository for %s.\nType %sYES%s if you want to use it: " "${RED}" "${NC}" "${GAME}" "${BLUE}" "${NC}"
+	read -r
+	if [[ $REPLY != "YES" ]]; then
+		printf "\n%sExiting...%s\n" "${GREEN}" "${NC}"
+		exit 0
 	fi
+	printf "\n%sUsing existing repository...%s\n" "${GREEN}" "${NC}"
+	VOLUME=1
+else
+	VOLUME=0
+fi
 
-	return 0
-}
+# Get the TCP port(s) to be exposed
+USERTCP=$(whiptail --title "LinuxGSM v${VERSION}" --inputbox \
+"Please, enter the TCP Ports to be exposed or leave empty if none.\nSeparate multiple ports with spaces.\nUse a dash for ranges.\n\ne.g.: 27015 27020-27030 30000" \
+12 60 3>&1 1>&2 2>&3)
 
-function fn_container() # Ask one last time if I should create the container
-{
-	## Just DO IT
-	if (whiptail --title "LinuxGSM v${VERSION}" --yesno "I will create a Docker container named ${GAME}.\nProceed?" 10 60); then
-		printf "\nCreating %s%s%s container.\nPlease wait...\n" "${GREEN}" "${GAME}" "${NC}"
-		docker run -d -i -t --init -h $GAME --name $GAME -u linuxgsm --restart unless-stopped -v $GAME:/home/linuxgsm $TCPPORTS $UDPPORTS \
-		-e GAMESERVER=$GAME -e LGSM_GITHUBUSER=GameServerManagers -e LGSM_GITHUBREPO=LinuxGSM -e LGSM_GITHUBBRANCH=master \
-		gameservermanagers/linuxgsm-docker:latest > /dev/null 2>&1
-	## Aborting and deleting volume
-	elif [[ "${VOLUME}" == "0" ]]; then
-		printf "\nRemoving %s volume.\n" "${GAME}"
-		docker volume rm "${GAME}" > /dev/null 2>&1
-		exit 1
-	## Aborting and preserving volume
-	elif [[ "${VOLUME}" == "1" ]]; then
-		printf "\nDon't worry. Volume %s will be preserved. Bye!\n" "${GAME}"
-		exit 1
-	fi
+## Check if variable has a valid string
+fn_varcheck "${USERTCP}"
 
-	return 0
-}
+# Get the UDP port(s) to be exposed
+USERUDP=$(whiptail --title "LinuxGSM v${VERSION}" --inputbox \
+"Now, enter the UDP Ports to be exposed or leave empty if none.\nSame as before: Separate multiple ports with spaces\nand a dash for ranges.\n\ne.g.: 27015 27020-27030 30000" \
+12 60 3>&1 1>&2 2>&3)
 
-# Main
-fn_dependency
+## Check if variable has a valid string
+fn_varcheck "${USERUDP}"
 
-fn_game
+# Check if both variables are not empty
+if [[ -z ${USERTCP} && -z ${USERUDP} ]]; then
+	printf "\n%sYou must type at least one TCP or UDP port.%s\n" "${RED}" "${NC}"
+	exit 1
+fi
 
+# So far, so good
+printf "\nMoving on...\n"
+
+## Arrange TCP and/or UDP port(s)
 fn_ports
 
-fn_volume
-
-fn_container
+# Create the container
+if (whiptail --title "LinuxGSM v${VERSION}" --yesno "I will create a Docker container named ${GAME}.\nProceed?" 10 60); then
+	printf "\nCreating %s%s%s container.\nPlease wait, this may take a while...\n" "${GREEN}" "${GAME}" "${NC}"
+	if [[ "${VOLUME}" == "0" ]]; then
+		printf "\nCreating Docker volume %s to store your game files.\n" "${GAME}"
+		docker volume create "${GAME}" > /dev/null 2>&1
+	elif [[ "${VOLUME}" == "1" ]]; then
+		printf "\nUsing Docker volume %s previously created.\n" "${GAME}"
+	fi
+	docker run -d -i -t --init -h $GAME --name $GAME -u linuxgsm --restart unless-stopped -v $GAME:/home/linuxgsm $TCPPORTS $UDPPORTS \
+	-e GAMESERVER=$GAME -e LGSM_GITHUBUSER=GameServerManagers -e LGSM_GITHUBREPO=LinuxGSM -e LGSM_GITHUBBRANCH=master \
+	gameservermanagers/linuxgsm-docker:latest > /dev/null 2>&1
+else
+	printf "\nAborting...\n"
+fi
 
 exit 0
