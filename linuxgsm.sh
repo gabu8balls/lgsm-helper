@@ -103,17 +103,9 @@ function fn_varcheck() # Check if variable has a valid string
 			printf "\n%sSorry, invalid format.\nIt must be like this: 27015 27020-27030 30000%s\n" "${RED}" "${NC}"
 			exit 1
 		fi
-		#
-		#PORTLIST=$(echo "${USERPORTS}" | tr "-" " ")
-		#
-		echo "Antes: ${USERPORTS}"
 		USERPORTS=$(echo "${USERPORTS}" | tr "-" " ")
-		echo "Depois: ${USERPORTS}"
-		IFS=" "
-		PORTLIST=( "${USERPORTS}" )
+		IFS=' ' read -r -a PORTLIST <<< "${USERPORTS}"
 		IFS="$oIFS"
-		echo "Final: ${PORTLIST[0]}"
-		#
 		for PORTTEST in "${PORTLIST[@]}"; do
 			if [[ ${PORTTEST} =~ [0-9]{4,5} ]]; then
 				if [[ ${PORTTEST} -lt 1025 || ${PORTTEST} -gt 49150 ]]; then
