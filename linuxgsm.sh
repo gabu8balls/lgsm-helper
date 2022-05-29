@@ -107,6 +107,7 @@ function fn_varcheck() # Check if variable has a valid string
 			printf "\n%sSorry, invalid format.\nIt must be like this: 27015 27020-27030 30000%s\n" "${RED}" "${NC}"
 			exit 1
 		fi
+
 		IFS=' '
 		read -r -a PORTRANGE <<< "${USERPORTS}"
 		IFS="$oIFS"
@@ -115,7 +116,6 @@ function fn_varcheck() # Check if variable has a valid string
 		read -r -a PORTLIST <<< "${USERPORTS}"
 		IFS="$oIFS"
 
-		#
 		for PORTTEST in "${PORTRANGE[@]}"; do
 			if [[ ${PORTTEST} =~ \- ]]; then
 				PORTTEST=$(echo "${PORTTEST}" | tr "-" " ")
@@ -128,13 +128,13 @@ function fn_varcheck() # Check if variable has a valid string
 				fi
 			fi
 		done
-		#
 
 		for PORTTEST in "${PORTLIST[@]}"; do
 			if [[ ! ${PORTTEST} =~ [0-9]{4,5} ]]; then
 				printf "\n%sPort(s) must be higher than 1024 and lower than 49151.%s\n" "${RED}" "${NC}"
 				exit 1
 			fi
+
 			if [[ ${PORTTEST} -lt 1025 || ${PORTTEST} -gt 49150 ]]; then
 				printf "\n%sPort(s) must be higher than 1024 and lower than 49151.%s\n" "${RED}" "${NC}"
 				exit 1
@@ -153,19 +153,23 @@ function fn_ports() # Arrange TCP and/or UDP port(s)
 
 	if [[ -n "${USERTCP}" ]]; then
 		IFS=' ' read -r -a PORTARRAY <<< "${USERTCP}"
+
 		while [ "$Y" -lt "${#PORTARRAY[@]}" ]; do
 			TCPPORTS="$TCPPORTS -p ${PORTARRAY[$Y]}:${PORTARRAY[$Y]}/tcp"
 			(( Y++ )) || true
 		done
+
 		IFS="$oIFS"
 	fi
 
 	if [[ -n "${USERUDP}" ]]; then
 		IFS=' ' read -r -a PORTARRAY <<< "${USERUDP}"
+
 		while [ "$Z" -lt "${#PORTARRAY[@]}" ]; do
 			UDPPORTS="$UDPPORTS -p ${PORTARRAY[$Z]}:${PORTARRAY[$Z]}/udp"
 			(( Z++ )) || true
 		done
+
 		IFS="$oIFS"
 	fi
 
