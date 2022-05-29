@@ -95,8 +95,11 @@ function fn_menu() # Create the menu
 function fn_varcheck() # Check if variable has a valid string
 {
 	declare USERPORTS="$1"
-	declare -a RANGES
+	declare -a PORTRANGE
 	declare -a PORTLIST
+	declare -a RANGETEMP
+	declare -i RANGE1ST
+	declare -i RANGE2ND
 	declare PORTTEST
 
 	if [[ -n "${USERPORTS}" ]]; then
@@ -104,10 +107,29 @@ function fn_varcheck() # Check if variable has a valid string
 			printf "\n%sSorry, invalid format.\nIt must be like this: 27015 27020-27030 30000%s\n" "${RED}" "${NC}"
 			exit 1
 		fi
-		#TODO: Verify in port ranges if the later is higher
-		USERPORTS=$(echo "${USERPORTS}" | tr "-" " ")
-		IFS=' ' read -r -a PORTLIST <<< "${USERPORTS}"
+		IFS=' '
+		read -r -a PORTRANGE <<< "${USERPORTS}"
 		IFS="$oIFS"
+		USERPORTS=$(echo "${USERPORTS}" | tr "-" " ")
+		IFS=' '
+		read -r -a PORTLIST <<< "${USERPORTS}"
+		IFS="$oIFS"
+
+		#
+		for PORTTEST in "${PORTRANGE[@]}"; do
+			if [[ ${PORTTEST} =~ \- ]]; then
+				PORTTEST=$(echo "${PORTTEST}" | tr "-" " ")
+				RANGETEMP=( "${PORTTEST}" )
+				RANGE1ST="${RANGETEMP[0]}"
+				RANGE2ND="${RANGETEMP[1]}"
+				if [[ "${RANGE1ST}" -ge "${RANGE2ND}" ]]; then
+					printf "\n%sIn a port range, the first value must be lower than the second.%s\n" "${RED}" "${NC}"
+					exit 1
+				fi
+			fi
+		done
+		#
+
 		for PORTTEST in "${PORTLIST[@]}"; do
 			if [[ ! ${PORTTEST} =~ [0-9]{4,5} ]]; then
 				printf "\n%sPort(s) must be higher than 1024 and lower than 49151.%s\n" "${RED}" "${NC}"
