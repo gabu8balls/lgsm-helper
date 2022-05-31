@@ -22,12 +22,12 @@
 declare -gr VERSION="0.1a"
 declare -gr oIFS="$IFS"
 
+declare -gi VOLUME
+
 declare -g RED; RED=$(tput setaf 1)
 declare -g GREEN; GREEN=$(tput setaf 2)
 declare -g BLUE; BLUE=$(tput setaf 4)
 declare -g NC; NC=$(tput sgr0)
-
-declare -gi VOLUME
 
 declare -g GAME
 declare -g USERTCP
@@ -65,9 +65,7 @@ function fn_srvlist() # Process the server list data
 		GAMEID+=("${GAMEARRAY[1]}")
 		GAMENAME+=("${GAMEARRAY[2]}")
 	done < /tmp/serverlist.csv
-
 	IFS="$oIFS"
-
 	for (( X=0; X < NUM; X++ )); do
 		printf '%s¦ %s ¦' "${GAMEID[$X]}" "${GAMENAME[$X]}"
 	done
@@ -83,7 +81,6 @@ function fn_menu() # Create the menu
 	IFS="¦"
 	GAME=$(whiptail --menu "Choose a game:" --title "LinuxGSM v${VERSION}" 30 60 22 ${GAMESLIST} 3>&1 1>&2 2>&3)
 	IFS="$oIFS"
-
 	if [[ -z ${GAME} ]]; then
 		printf "\n%sYou must choose a game.%s\n" "${RED}" "${NC}"
 		exit 1
@@ -98,8 +95,6 @@ function fn_varcheck() # Check if variable has a valid string
 	declare -a PORTRANGE
 	declare -a PORTLIST
 	declare -a RANGETEMP
-	declare -i RANGE1ST
-	declare -i RANGE2ND
 	declare PORTTEST
 
 	if [[ -n "${USERPORTS}" ]]; then
@@ -107,34 +102,24 @@ function fn_varcheck() # Check if variable has a valid string
 			printf "\n%sSorry, invalid format.\nIt must be like this: 27015 27020-27030 30000%s\n" "${RED}" "${NC}"
 			exit 1
 		fi
-
-		IFS=' '
-		read -r -a PORTRANGE <<< "${USERPORTS}"
-		IFS="$oIFS"
+		IFS=' ' read -r -a PORTRANGE <<< "${USERPORTS}"
 		USERPORTS=$(echo "${USERPORTS}" | tr "-" " ")
-		IFS=' '
-		read -r -a PORTLIST <<< "${USERPORTS}"
-		IFS="$oIFS"
-
+		IFS=' ' read -r -a PORTLIST <<< "${USERPORTS}"
 		for PORTTEST in "${PORTRANGE[@]}"; do
 			if [[ ${PORTTEST} =~ \- ]]; then
 				PORTTEST=$(echo "${PORTTEST}" | tr "-" " ")
-				RANGETEMP=( "${PORTTEST}" )
-				RANGE1ST="${RANGETEMP[0]}"
-				RANGE2ND="${RANGETEMP[1]}"
-				if [[ "${RANGE1ST}" -ge "${RANGE2ND}" ]]; then
+				IFS=' ' read -r -a RANGETEMP <<< "${PORTTEST}"
+				if [[ "${RANGETEMP[0]}" -ge "${RANGETEMP[1]}" ]]; then
 					printf "\n%sIn a port range, the first value must be lower than the second.%s\n" "${RED}" "${NC}"
 					exit 1
 				fi
 			fi
 		done
-
 		for PORTTEST in "${PORTLIST[@]}"; do
 			if [[ ! ${PORTTEST} =~ [0-9]{4,5} ]]; then
 				printf "\n%sPort(s) must be higher than 1024 and lower than 49151.%s\n" "${RED}" "${NC}"
 				exit 1
 			fi
-
 			if [[ ${PORTTEST} -lt 1025 || ${PORTTEST} -gt 49150 ]]; then
 				printf "\n%sPort(s) must be higher than 1024 and lower than 49151.%s\n" "${RED}" "${NC}"
 				exit 1
@@ -153,24 +138,17 @@ function fn_ports() # Arrange TCP and/or UDP port(s)
 
 	if [[ -n "${USERTCP}" ]]; then
 		IFS=' ' read -r -a PORTARRAY <<< "${USERTCP}"
-
 		while [ "$Y" -lt "${#PORTARRAY[@]}" ]; do
 			TCPPORTS="$TCPPORTS -p ${PORTARRAY[$Y]}:${PORTARRAY[$Y]}/tcp"
 			(( Y++ )) || true
 		done
-
-		IFS="$oIFS"
 	fi
-
 	if [[ -n "${USERUDP}" ]]; then
 		IFS=' ' read -r -a PORTARRAY <<< "${USERUDP}"
-
 		while [ "$Z" -lt "${#PORTARRAY[@]}" ]; do
 			UDPPORTS="$UDPPORTS -p ${PORTARRAY[$Z]}:${PORTARRAY[$Z]}/udp"
 			(( Z++ )) || true
 		done
-
-		IFS="$oIFS"
 	fi
 
 	return 0
@@ -202,7 +180,6 @@ if docker container ls | grep "${GAME}" > /dev/null 2>&1; then
 	printf "\n%sWARNING!!!%s\n\nGame server %s already exists.\nPlease, select another game.\n" "${RED}" "${NC}" "${GAME}"
 	exit 1
 fi
-
 if docker volume ls | grep "${GAME}" > /dev/null 2>&1; then
 	printf "\n%sWARNING!!!%s\n\nThere is already a repository for %s.\nType %sYES%s if you want to use it: " "${RED}" "${NC}" "${GAME}" "${BLUE}" "${NC}"
 	read -r
@@ -250,7 +227,7 @@ if (whiptail --title "LinuxGSM v${VERSION}" --yesno "I will create a Docker cont
 	elif [[ "${VOLUME}" == "1" ]]; then
 		printf "\nUsing Docker volume %s previously created.\n" "${GAME}"
 	fi
-	eval docker run -d -i -t --init -h "${GAME}" --name "${GAME}" -u linuxgsm --restart unless-stopped -v "${GAME}":/home/linuxgsm "${TCPPORTS}" "${UDPPORTS}" \
+	eval echo docker run -d -i -t --init -h "${GAME}" --name "${GAME}" -u linuxgsm --restart unless-stopped -v "${GAME}":/home/linuxgsm "${TCPPORTS}" "${UDPPORTS}" \
 	-e GAMESERVER="${GAME}" -e LGSM_GITHUBUSER=GameServerManagers -e LGSM_GITHUBREPO=LinuxGSM -e LGSM_GITHUBBRANCH=master \
 	gameservermanagers/linuxgsm-docker:latest > /dev/null 2>&1
 else
