@@ -19,7 +19,7 @@
 #                          GLOBAL VARIABLES                          #
 ######################################################################
 
-declare -gr VERSION="0.1a"
+declare -gr VERSION="0.1b"
 declare -gr oIFS="$IFS"
 
 declare -gi VOLUME
@@ -65,7 +65,6 @@ function fn_srvlist() # Process the server list data
 		GAMEID+=("${GAMEARRAY[1]}")
 		GAMENAME+=("${GAMEARRAY[2]}")
 	done < /tmp/serverlist.csv
-	IFS="$oIFS"
 	for (( X=0; X < NUM; X++ )); do
 		printf '%s¦ %s ¦' "${GAMEID[$X]}" "${GAMENAME[$X]}"
 	done
@@ -105,16 +104,6 @@ function fn_varcheck() # Check if variable has a valid string
 		IFS=' ' read -r -a PORTRANGE <<< "${USERPORTS}"
 		USERPORTS=$(echo "${USERPORTS}" | tr "-" " ")
 		IFS=' ' read -r -a PORTLIST <<< "${USERPORTS}"
-		for PORTTEST in "${PORTRANGE[@]}"; do
-			if [[ ${PORTTEST} =~ \- ]]; then
-				PORTTEST=$(echo "${PORTTEST}" | tr "-" " ")
-				IFS=' ' read -r -a RANGETEMP <<< "${PORTTEST}"
-				if [[ "${RANGETEMP[0]}" -ge "${RANGETEMP[1]}" ]]; then
-					printf "\n%sIn a port range, the first value must be lower than the second.%s\n" "${RED}" "${NC}"
-					exit 1
-				fi
-			fi
-		done
 		for PORTTEST in "${PORTLIST[@]}"; do
 			if [[ ! ${PORTTEST} =~ [0-9]{4,5} ]]; then
 				printf "\n%sPort(s) must be higher than 1024 and lower than 49151.%s\n" "${RED}" "${NC}"
@@ -123,6 +112,16 @@ function fn_varcheck() # Check if variable has a valid string
 			if [[ ${PORTTEST} -lt 1025 || ${PORTTEST} -gt 49150 ]]; then
 				printf "\n%sPort(s) must be higher than 1024 and lower than 49151.%s\n" "${RED}" "${NC}"
 				exit 1
+			fi
+		done
+		for PORTTEST in "${PORTRANGE[@]}"; do
+			if [[ ${PORTTEST} =~ \- ]]; then
+				PORTTEST=$(echo "${PORTTEST}" | tr "-" " ")
+				IFS=' ' read -r -a RANGETEMP <<< "${PORTTEST}"
+				if [[ "${RANGETEMP[0]}" -ge "${RANGETEMP[1]}" ]]; then
+					printf "\n%sIn a port range, the first value must be lower than the second.%s\n" "${RED}" "${NC}"
+					exit 1
+				fi
 			fi
 		done
 	fi
@@ -227,7 +226,7 @@ if (whiptail --title "LinuxGSM v${VERSION}" --yesno "I will create a Docker cont
 	elif [[ "${VOLUME}" == "1" ]]; then
 		printf "\nUsing Docker volume %s previously created.\n" "${GAME}"
 	fi
-	eval echo docker run -d -i -t --init -h "${GAME}" --name "${GAME}" -u linuxgsm --restart unless-stopped -v "${GAME}":/home/linuxgsm "${TCPPORTS}" "${UDPPORTS}" \
+	eval docker run -d -i -t --init -h "${GAME}" --name "${GAME}" -u linuxgsm --restart unless-stopped -v "${GAME}":/home/linuxgsm "${TCPPORTS}" "${UDPPORTS}" \
 	-e GAMESERVER="${GAME}" -e LGSM_GITHUBUSER=GameServerManagers -e LGSM_GITHUBREPO=LinuxGSM -e LGSM_GITHUBBRANCH=master \
 	gameservermanagers/linuxgsm-docker:latest > /dev/null 2>&1
 else
