@@ -7,6 +7,8 @@
 # André (Magrão) Borali                                              #
 # andreborali at gmail.com                                           #
 #                                                                    #
+# Date: 2024-04-19                                                   #
+#                                                                    #
 #                                                                    #
 #                                                                    #
 # Unofficial script to create a LinuxGSM container                   #
@@ -19,7 +21,7 @@
 #                          GLOBAL VARIABLES                          #
 ######################################################################
 
-declare -gr VERSION="0.1b"
+declare -gr VERSION="0.2"
 declare -gr oIFS="$IFS"
 
 declare -gi VOLUME
@@ -62,7 +64,7 @@ function fn_srvlist() # Process the server list data
 	declare -i X
 
 	while IFS=',' read -ra GAMEARRAY; do
-		GAMEID+=("${GAMEARRAY[1]}")
+		GAMEID+=("${GAMEARRAY[0]}")
 		GAMENAME+=("${GAMEARRAY[2]}")
 	done < /tmp/serverlist.csv
 	for (( X=0; X < NUM; X++ )); do
@@ -168,6 +170,9 @@ if ! wget -q -O /tmp/serverlist.csv https://raw.githubusercontent.com/GameServer
 	exit 1
 fi
 
+# Remove the header from server list
+sed -i '1d' /tmp/serverlist.csv
+
 ## Create the menu
 fn_menu
 
@@ -175,11 +180,11 @@ fn_menu
 rm /tmp/serverlist.csv
 
 # Check if game server already exists
-if docker container ls | grep "${GAME}" > /dev/null 2>&1; then
+if docker container ls | grep lgsm-"${GAME}"server > /dev/null 2>&1; then
 	printf "\n%sWARNING!!!%s\n\nGame server %s already exists.\nPlease, select another game.\n" "${RED}" "${NC}" "${GAME}"
 	exit 1
 fi
-if docker volume ls | grep "${GAME}" > /dev/null 2>&1; then
+if docker volume ls | grep lgsm-"${GAME}"server > /dev/null 2>&1; then
 	printf "\n%sWARNING!!!%s\n\nThere is already a repository for %s.\nType %sYES%s if you want to use it: " "${RED}" "${NC}" "${GAME}" "${BLUE}" "${NC}"
 	read -r
 	if [[ $REPLY != "YES" ]]; then
@@ -218,17 +223,19 @@ fi
 fn_ports
 
 # Create the container
-if (whiptail --title "LinuxGSM v${VERSION}" --yesno "I will create a Docker container named ${GAME}.\nProceed?" 10 60); then
-	printf "\nCreating %s%s%s container.\nPlease wait, this may take a while...\n" "${GREEN}" "${GAME}" "${NC}"
+if (whiptail --title "LinuxGSM v${VERSION}" --yesno "Ready to create a container named ${GAME}.\nProceed?" 10 60); then
+	printf "\nI will create the %s%s%s container.\nPlease wait, this may take a while.\n" "${GREEN}" "${GAME}" "${NC}"
 	if [[ "${VOLUME}" == "0" ]]; then
-		printf "\nCreating Docker volume %s to store your game files.\n" "${GAME}"
-		docker volume create "${GAME}" > /dev/null 2>&1
+		printf "\nCreating Docker volume %s to store your game files...\n" "${GAME}"
+		docker volume create lgsm-"${GAME}"server > /dev/null 2>&1
+		printf "%sDone.%s\n" "${GREEN}" "${NC}"
 	elif [[ "${VOLUME}" == "1" ]]; then
 		printf "\nUsing Docker volume %s previously created.\n" "${GAME}"
 	fi
-	eval docker run -d -i -t --init -h "${GAME}" --name "${GAME}" -u linuxgsm --restart unless-stopped -v "${GAME}":/home/linuxgsm "${TCPPORTS}" "${UDPPORTS}" \
-	-e GAMESERVER="${GAME}" -e LGSM_GITHUBUSER=GameServerManagers -e LGSM_GITHUBREPO=LinuxGSM -e LGSM_GITHUBBRANCH=master \
-	gameservermanagers/linuxgsm-docker:latest > /dev/null 2>&1
+	printf "\nCreating Docker container %s...\n" "${GAME}"
+	eval docker run -d --init -h "${GAME}" --name lgsm-"${GAME}"server --restart unless-stopped -v lgsm-"${GAME}"server:/data "${TCPPORTS}" "${UDPPORTS}" \
+	gameservermanagers/gameserver:"${GAME}" > /dev/null 2>&1
+	printf "%sDone.%s\n" "${GREEN}" "${NC}"
 else
 	printf "\nAborting...\n"
 fi
